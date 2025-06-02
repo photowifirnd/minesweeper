@@ -30,6 +30,7 @@ def main():
             col = int(x / CELL_SIZE)
             if 0 <= row < GRID_SIZE and 0 <= col < GRID_SIZE:
                 if board_field[row][col] == 'M':
+                    print(f"Mine clicked at ({row}, {col}). Setting continue_game=False, win_game=False.") # Add this line
                     continue_game = False
                     win_game = False
                     break
@@ -47,21 +48,31 @@ def main():
 
 def reveal_empty_cells(board_field, discovered, row, col):
     stack = [(row, col)]
-    print(f"clicked on: {stack}")
+    print(f"clicked on: {stack}") # Keep this print for debugging
     while stack:
         current_row, current_col = stack.pop()
-        print(f"this is an explosion cell board_field{current_row, current_col}")
-        if 0 <= current_row < GRID_SIZE and 0 <= current_col < GRID_SIZE and not discovered[current_row][current_col]:
-            discovered[current_row][current_col] = True
-            if board_field[current_row][current_col] == 0:
-                for delta_row in [-1, 0, 1]:
-                    for delta_col in [-1, 0, 1]:
-                        if delta_row != 0 or delta_col != 0:
-                            new_row = current_row + delta_row
-                            new_col = current_col + delta_col
-                            if 0 <= new_row < GRID_SIZE and 0 <= new_col < GRID_SIZE and not discovered[new_row][new_col]:
-                                if board_field[new_row][new_col] != 'M':
-                                    stack.append((new_row, new_col))
+        print(f"this is an explosion cell board_field{current_row, current_col}") # Keep this print
+        # Original check:
+        # if 0 <= current_row < GRID_SIZE and 0 <= current_col < GRID_SIZE and not discovered[current_row][current_col]:
+        # Change to:
+        if not (0 <= current_row < GRID_SIZE and 0 <= current_col < GRID_SIZE and not discovered[current_row][current_col]):
+            continue # Skip if out of bounds or already discovered
+
+        discovered[current_row][current_col] = True
+        if board_field[current_row][current_col] == 0:
+            for delta_row in [-1, 0, 1]:
+                for delta_col in [-1, 0, 1]:
+                    if delta_row != 0 or delta_col != 0:
+                        new_row = current_row + delta_row
+                        new_col = current_col + delta_col
+                        # Add a check here to prevent adding mines to the stack
+                        if 0 <= new_row < GRID_SIZE and 0 <= new_col < GRID_SIZE and \
+                           not discovered[new_row][new_col] and \
+                           board_field[new_row][new_col] != 'M': # Ensure it's not a mine
+                            stack.append((new_row, new_col))
+        # If the cell itself is a numbered cell (not 0 and not a Mine), it should just be revealed.
+        # The original logic implicitly handles this by not continuing the loop for non-zero cells.
+        # No change needed for this part, but ensure discovered[current_row][current_col] = True is set before any stack operations.
 
 def count_adjacent_mines(row, col, board_field):
     """
@@ -106,6 +117,7 @@ def reveal_all_mines(canvas, board_field):
                 draw_mine(canvas, row, col)
 
 def final_redraw(canvas, board_field, win_game):
+    print(f"final_redraw called. win_game: {win_game}") # Add this line
     for row in range(GRID_SIZE):
         for col in range(GRID_SIZE):
             value = board_field[row][col]
@@ -133,8 +145,8 @@ def finish_game(canvas, won):
     )
     else:
         canvas.create_text(
-        canvas.get_width() / 2,
-        canvas.get_height() / 2,
+        canvas.get_width() // 2,
+        canvas.get_height() // 2,
         text="💥BOOM!!! You Lose.",
         font='Arial',
         font_size=24,
@@ -144,12 +156,17 @@ def finish_game(canvas, won):
 
 def put_mines_in_board_field(board_field):
     mines_in_board = 0
+    print(f"Starting mine placement. Target MINES: {MINES}, GRID_SIZE: {GRID_SIZE}") # Add this line
     while mines_in_board < MINES:
         row = random.randint(0, GRID_SIZE - 1)
         col = random.randint(0, GRID_SIZE - 1)
         if board_field[row][col] != 'M':
             board_field[row][col] = 'M'
             mines_in_board += 1
+            print(f"Placed mine {mines_in_board} at ({row}, {col})") # Add this line
+        # else: # Optional: Log if a chosen spot was already a mine
+            # print(f"Attempted to place mine at ({row}, {col}), but it was already a mine. Retrying.")
+    print("Mine placement complete.") # Add this line
 def redraw(canvas, discovered, board_field):
     canvas.clear()
     for row in range(GRID_SIZE):
@@ -169,30 +186,22 @@ def redraw(canvas, discovered, board_field):
                 pos_y = row * CELL_SIZE + CELL_SIZE / 2
                 canvas.create_text(pos_x, pos_y, text=str(value), font='Arial', font_size='16')
 def draw_mine(canvas, row, col):
-    center_x = col * CELL_SIZE + CELL_SIZE / 2
-    center_y = row * CELL_SIZE + CELL_SIZE / 2
-    radius = CELL_SIZE * 0.2  # Puedes ajustar este valor para cambiar el tamaño
+    print(f"draw_mine called for cell ({row}, {col})") 
+    center_x_float = col * CELL_SIZE + CELL_SIZE / 2
+    center_y_float = row * CELL_SIZE + CELL_SIZE / 2
+    
+    # Use integers for drawing coordinates
+    center_x = int(center_x_float)
+    center_y = int(center_y_float)
+    
+    radius = CELL_SIZE * 0.2 
 
     # Dibuja un círculo negro para representar la mina
     canvas.create_oval(
-        center_x - radius, center_y - radius,
-        center_x + radius, center_y + radius,
+        center_x - int(radius), center_y - int(radius), # Cast radius effects to int
+        center_x + int(radius), center_y + int(radius), # Cast radius effects to int
         color='black'
     )
     # Dibuja líneas radiales como "púas" de la mina
-    for angle in range(0, 360, 45):  # Cada 45 grados
-        dx = CELL_SIZE * 0.3 * math.cos(math.radians(angle))
-        dy = CELL_SIZE * 0.3 * math.sin(math.radians(angle))
-        try:
-            print(f"DRAW LINE from ({center_x}, {center_y}) to "
-                f"({center_x + dx}, {center_y + dy})")  # Debug print
-            canvas.create_line(
-                center_x, center_y,
-                center_x + dx, center_y + dy,
-                color='black'
-            )
-        except Exception as e:
-            print(f"Error drawing line: ({row}, {col}){e}")
-
 if __name__ == '__main__':
     main()
