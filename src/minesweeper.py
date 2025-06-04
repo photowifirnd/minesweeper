@@ -4,55 +4,71 @@ import math
 import time
 import os
 
-# Setup of Board Header
-HEADER_SIZE = 50
+# Difficult Level
+LEVELS = {
+    'Easy': (8, 0.20),
+    'Medium': (12, 0.22),
+    'Hard': (16, 0.30)
+}
 # Configuraciñones de la cuadrícula
-GRID_SIZE = 8
+FOOTER_SIZE = 50
 CELL_SIZE = 50
 #Time Limits
 TIME = 0.000001
 #Text properties
 text_sz = 30
-# Amount of mines: This  be configurable
-MINES = int(GRID_SIZE * GRID_SIZE * (20 / 100))
 def main():
-    #total_mines = int(GRID_SIZE * GRID_SIZE * (20 / 100))
-    #print(f"Total mines is 20% of Cells: ({MINES})")
-    canvas = Canvas(width=GRID_SIZE * CELL_SIZE, height=GRID_SIZE * CELL_SIZE)
-    #print(f"Canvas type: {type(canvas)}")
+    global GRID_SIZE, WIDTH, HEIGHT, MINES
+    GRID_SIZE = 8
+    CELL_SIZE = 50
+    WIDTH = GRID_SIZE * CELL_SIZE
+    HEIGHT = GRID_SIZE * CELL_SIZE + FOOTER_SIZE
+    MINES = int(GRID_SIZE * GRID_SIZE * (20 / 100))
+    canvas = Canvas(400, 400)
+    grid_size, mine_ratio = pick_your_level(canvas)
+    width = grid_size * CELL_SIZE
+    height = grid_size * CELL_SIZE + FOOTER_SIZE
+    mines = int(grid_size * grid_size * mine_ratio)
+    GRID_SIZE = grid_size
+    WIDTH = width
+    HEIGHT = height
+    MINES = mines
+    aux_width = WIDTH - 40
+    aux_height = GRID_SIZE * CELL_SIZE + 25
+    canvas = Canvas(width, height)
+    timer_display = canvas.create_text(aux_width, aux_height, text='000s', font='Courier', font_size=20, color='red', anchor='center')
+    mine_display = canvas.create_text(40, aux_height, text=str(MINES), font='Courier', font_size=20, color='blue', anchor='center')
+
     board_field = []
     discovered = []
     flags = []
     discovered_cells = 0
+    start_time = None
+    timer_id = None
     count_flags = 0
     init_game(canvas, board_field, discovered, flags)
     redraw(canvas, discovered, board_field)
-    #print("Board Field:")
-    '''for row in board_field:
-        print(row)
-    print("Discovered cells:")
-    for row in discovered:
-        print(row)
-    print("Flags in Board Field:")
-    for row in flags:
-        print(row)'''
     
-    # Change this when mines ara implemented on graphic board. THe game must end when a mine is clicked or all blank_spaces are discovered
     continue_game = True
     win_game = False
     is_shift_pressed = False
+    
+    
     while continue_game:
         key_press = canvas.get_last_key_press()
         click = canvas.get_last_click()
         if key_press == 'Shift':
             is_shift_pressed = True
         if click is not None:
+            if start_time is None:
+                start_time = time.time()
             x, y = click
             row = int(y / CELL_SIZE)
             col = int(x / CELL_SIZE)
             if is_shift_pressed:
                 draw_flag(canvas, flags, discovered, row, col)
                 count_flags = sum(cell is not None for row in flags for cell in row)
+                update_mine_display(canvas, mine_display, count_flags)
                 is_shift_pressed = False
             else:
                 if 0 <= row < GRID_SIZE and 0 <= col < GRID_SIZE:
@@ -67,18 +83,34 @@ def main():
                             discovered[row][col] = True
                             draw_cell(canvas, row, col, board_field, discovered)
                         discovered_cells = sum(sum_row.count(True) for sum_row in discovered)
-                        #redraw(canvas, discovered, board_field)
                         if discovered_cells == GRID_SIZE * GRID_SIZE - MINES:
                             win_game = True
                             continue_game = False
+        if start_time is not None:
+            update_timer(canvas, start_time, timer_display)
     final_redraw(canvas, board_field, win_game)
+def pick_your_level(canvas):
+    canvas.create_text(WIDTH // 2, 60, text="Pick your level", font='Courier', font_size=text_sz, color='black', anchor='center')
+    y=160
+    buttons = {}
+    for level, (size, ratio) in LEVELS.items():
+        rect_id = canvas.create_rectangle(WIDTH // 2 - 100, y, WIDTH // 2 + 100, y + 40, color='lightgray', outline='black')
+        text_id = canvas.create_text(WIDTH // 2, y + 20, text=level, font='Arial', font_size=18, anchor='center')
+        buttons[level] = (rect_id, text_id, y, y + 40)
+        y += 60
+    while True:
+        click = canvas.get_last_click()
+        if click is not None:
+            x, y = click
+            for level, (_, _, top, bottom) in buttons.items():
+                if WIDTH // 2 - 100 <= x <= WIDTH // 2 + 100 and top <= y <= bottom:
+                    canvas.clear()  # limpia la pantalla antes de crear el juego
+                    return LEVELS[level]
 
 def reveal_empty_cells(canvas, board_field, discovered, flags, row, col):
     stack = [(row, col)]
-    #print(f"clicked on: {stack}")
     while stack:
         current_row, current_col = stack.pop()
-        #print(f"this is an explosion cell board_field{current_row, current_col}")
         if 0 <= current_row < GRID_SIZE and 0 <= current_col < GRID_SIZE and not discovered[current_row][current_col] and flags[current_row][current_col] == None:
             discovered[current_row][current_col] = True
             draw_cell(canvas, current_row,current_col, board_field, discovered)
@@ -161,27 +193,20 @@ def final_redraw(canvas, board_field, win_game):
     reveal_all_mines(canvas, board_field)
     finish_game(canvas, win_game)
 def finish_game(canvas, won):
-    #print(f"Canvas type: {type(canvas)}")
+    text="💥BOOM!!! You Lose."
+    color = "red"
     if won:
-        canvas.create_text(
+        text="🏆 You Win!!"
+        color='green'
+    canvas.create_text(
         canvas.get_width() // 2,
-        canvas.get_height() // 2,
-        text="🏆 You Win!!",
-        font='Arial',
-        font_size=24,
-        color='green',
+        canvas.get_height() - 25,
+        text=text,
+        font='Courier',
+        font_size=20,
+        color=color,
         anchor='center'
     )
-    else:
-        canvas.create_text(
-        canvas.get_width() // 2,
-        canvas.get_height() // 2,
-        text="💥BOOM!!! You Lose.",
-        font='Arial',
-        font_size=24,
-        color='red',
-        anchor='center'
-)
 
 def put_mines_in_board_field(board_field):
     mines_in_board = 0
@@ -191,6 +216,14 @@ def put_mines_in_board_field(board_field):
         if board_field[row][col] != 'M':
             board_field[row][col] = 'M'
             mines_in_board += 1
+# Timer control: Updates the time in seconds
+def update_timer(canvas, start_time, timer_display):
+    elapsed_time = int(time.time() - start_time)
+    canvas.change_text(timer_display, f'{elapsed_time:03d}s')
+    return elapsed_time
+def update_mine_display(canvas, mine_display, count_flags):
+    remain = MINES - count_flags
+    canvas.change_text(mine_display, f'{remain:02d}')
 # Create a function to only reveal the cell that user click on. So we can improve the execution
 def draw_cell(canvas, row, col, board_field, discovered):
     left_x = col * CELL_SIZE
@@ -217,33 +250,15 @@ def draw_cell(canvas, row, col, board_field, discovered):
     
     #canvas.create_rectangle(left_x, top_y, right_x, bottom_y, color=color, outline='black')
 def redraw(canvas, discovered, board_field):
-    #canvas.clear()
     for row in range(GRID_SIZE):
         time.sleep(float(TIME))
         for col in range(GRID_SIZE):
-            left_x = col * CELL_SIZE
-            top_y = row * CELL_SIZE
-            right_x = left_x + CELL_SIZE
-            bottom_y = top_y + CELL_SIZE
-            if discovered[row][col]:
-                color = 'white'
-            else:
-                color = 'lightgrey'
-            #time.sleep(float(TIME))
-            canvas.create_rectangle(left_x, top_y, right_x, bottom_y, color=color, outline='black')
-            value = board_field[row][col]
-            if discovered[row][col] and str(value) != 'M' and value > 0:
-                if value == 1:
-                    color = 'blue'
-                elif value == 2:
-                    color = 'green'
-                else:
-                    color = 'red'
-                pos_x = col * CELL_SIZE + CELL_SIZE / 2
-                pos_y = row * CELL_SIZE + CELL_SIZE / 2
-                canvas.create_text(pos_x, pos_y, text=str(value), font='Arial', anchor='center', font_size=text_sz, color=color)
+            draw_cell(canvas, row, col, board_field, discovered)
 def draw_flag(canvas, flags, discovered, row, col):
     #print(f"Flag on ({row}, {col}) -> discovered[{row}][{col}] -> {discovered[row][col]}")
+    count_flags = sum(cell is not None for row in flags for cell in row)
+    #if count_flags >= MINES:
+        #return
     if not discovered[row][col]:
         if flags[row][col] is not None:
             left_x = col * CELL_SIZE
@@ -253,12 +268,12 @@ def draw_flag(canvas, flags, discovered, row, col):
             canvas.delete(flags[row][col])
             canvas.create_rectangle(left_x, top_y, right_x, bottom_y, color='lightgrey', outline='black')
             flags[row][col] = None
-        else:
+        elif  count_flags < MINES:
             filename = 'flag.png'
             if not os.path.exists(filename):
                 pos_x = col * CELL_SIZE + CELL_SIZE / 2
                 pos_y = row * CELL_SIZE + CELL_SIZE / 2
-                obj_id = canvas.create_text(pos_x, pos_y, text='🚩', anchor='center', font_size='30')
+                obj_id = canvas.create_text(pos_x, pos_y, text='🚩', anchor='center', font_size=text_sz)
                 
             else:
                 pos_x = col * CELL_SIZE
@@ -266,12 +281,11 @@ def draw_flag(canvas, flags, discovered, row, col):
                 obj_id = canvas.create_image_with_size(pos_x, pos_y, CELL_SIZE, CELL_SIZE, filename)
             flags[row][col] = obj_id
 def draw_mine(canvas, row, col):
-   
     filename = 'mine.png'
     if not os.path.exists(filename):
         center_x = col * CELL_SIZE + CELL_SIZE / 2
         center_y = row * CELL_SIZE + CELL_SIZE / 2
-        canvas.create_text(center_x, center_y, text='💣', anchor='center', font_size='30')
+        canvas.create_text(center_x, center_y, text='💣', anchor='center', font_size=text_sz)
     else:
         pos_x = col * CELL_SIZE
         pos_y = row * CELL_SIZE
