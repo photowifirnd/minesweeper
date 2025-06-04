@@ -3,6 +3,7 @@ import random
 import math
 import time
 import os
+from ai import call_gpt
 
 # Difficult Level
 LEVELS = {
@@ -24,6 +25,7 @@ def main():
     WIDTH = GRID_SIZE * CELL_SIZE
     HEIGHT = GRID_SIZE * CELL_SIZE + FOOTER_SIZE
     MINES = int(GRID_SIZE * GRID_SIZE * (20 / 100))
+    ai_button = {}
     canvas = Canvas(400, 400)
     grid_size, mine_ratio = pick_your_level(canvas)
     width = grid_size * CELL_SIZE
@@ -38,7 +40,28 @@ def main():
     canvas = Canvas(width, height)
     timer_display = canvas.create_text(aux_width, aux_height, text='000s', font='Courier', font_size=20, color='red', anchor='center')
     mine_display = canvas.create_text(40, aux_height, text=str(MINES), font='Courier', font_size=20, color='blue', anchor='center')
-
+    '''ai_rect = canvas.create_rectangle((width // 2 - 50), height - 10, width // 2 + 50, height - 40, color='lightgray', outline='black')
+    ai_display = canvas.create_text((width // 2 ), height - 25, text="Ask AI", font='Arial',font_size=20, color='black', anchor='center')
+    ai_button['ask_ai'] = {ai_rect, ai_display, height - 10, height - 40}'''
+    ai_rect = canvas.create_rectangle(
+        (width // 2 - 50), height - 40,  # top-left x, y
+        (width // 2 + 50), height - 10,  # bottom-right x, y
+        color='lightgray', outline='black'
+    )
+    ai_display = canvas.create_text(
+        (width // 2), height - 25,
+        text="Ask AI", font='Arial', font_size=20, color='black', anchor='center'
+    )
+    # Guardamos las coordenadas del área clicable
+    ai_button['ask_ai'] = {
+        'rect_id': ai_rect,
+        'text_id': ai_display,
+        'top': height - 40,
+        'bottom': height - 10,
+        'left': width // 2 - 50,
+        'right': width // 2 + 50
+    }
+    print(ai_button)
     board_field = []
     discovered = []
     flags = []
@@ -53,7 +76,8 @@ def main():
     win_game = False
     is_shift_pressed = False
     
-    
+    prompt = build_prompt(board_field, discovered, flags)
+    print(f"prompt = {prompt}")
     while continue_game:
         key_press = canvas.get_last_key_press()
         click = canvas.get_last_click()
@@ -63,8 +87,25 @@ def main():
             if start_time is None:
                 start_time = time.time()
             x, y = click
-            row = int(y / CELL_SIZE)
-            col = int(x / CELL_SIZE)
+            ai = ai_button.get('ask_ai')
+            print(ai)
+            print(f'x{x}, y{y}')
+            if ai and ai['left'] <= x <= ai['right'] and ai['top'] <= y <= ai['bottom']:
+                print("asking AI...")
+                prompt = build_prompt(board_field, discovered, flags)
+                res = call_gpt(prompt)
+                print(res)
+                aux_x, aux_y = res.split(',')
+                if aux_x[1].isdigit() and aux_y[1].isdigit():
+                    row = int(aux_x[1])
+                    col = int(aux_y[1])
+                else:
+                    row = int(int(y) / CELL_SIZE)
+                    col = int(int(x) / CELL_SIZE)
+                print(f'returned: {x},{y}')
+            else:
+                row = int(int(y) / CELL_SIZE)
+                col = int(int(x) / CELL_SIZE)
             if is_shift_pressed:
                 draw_flag(canvas, flags, discovered, row, col)
                 count_flags = sum(cell is not None for row in flags for cell in row)
@@ -88,6 +129,8 @@ def main():
                             continue_game = False
         if start_time is not None:
             update_timer(canvas, start_time, timer_display)
+    canvas.delete(ai_rect)
+    canvas.delete(ai_display)
     final_redraw(canvas, board_field, win_game)
 def pick_your_level(canvas):
     canvas.create_text(WIDTH // 2, 60, text="Pick your level", font='Courier', font_size=text_sz, color='black', anchor='center')
@@ -257,8 +300,7 @@ def redraw(canvas, discovered, board_field):
 def draw_flag(canvas, flags, discovered, row, col):
     #print(f"Flag on ({row}, {col}) -> discovered[{row}][{col}] -> {discovered[row][col]}")
     count_flags = sum(cell is not None for row in flags for cell in row)
-    #if count_flags >= MINES:
-        #return
+    
     if not discovered[row][col]:
         if flags[row][col] is not None:
             left_x = col * CELL_SIZE
@@ -291,6 +333,38 @@ def draw_mine(canvas, row, col):
         pos_y = row * CELL_SIZE
         image = canvas.create_image_with_size(pos_x, pos_y,CELL_SIZE, CELL_SIZE, filename)
     time.sleep(float(TIME))
-
+def build_prompt(board_field, discovered, flags):
+    board = []
+    prompt = (
+        "You are playing Minesweeper. it's mandatory you search the rules and basics of playing minesweeper Based on the current board state, suggest a single safe move "
+        "as a coordinate in the format (row, col), where row and col are zero-based integers.\n\n"
+        "Uncover all the empty cells without clicking on any mines. If you reveal all non-mine cells, you win! If you click on a mine, you lose.\n"
+        "Each cell may be:\n"
+        "- 'H' = hidden (not revealed)\n"
+        "- 'F' = flagged as a mine\n"
+        "- 'M' = revealed mine (should not appear in suggested moves)\n"
+        "- '0'-'8' = number of adjacent mines (revealed cell)\n\n"
+        "Only suggest a cell that is currently hidden ('H') and not flagged ('F').\n"
+        "Return ONLY one coordinate, like this: (3, 5)\n\n"
+        "Current board:\n"
+    )
+    for d_row in range(GRID_SIZE):
+        aux = []
+        for d_col in range(GRID_SIZE):
+            if discovered[d_row][d_col]:
+                aux.append(board_field[d_row][d_col])
+            elif flags[d_row][d_col] is not None:
+                aux.append('F')
+            else:
+                aux.append('H')
+        board.append(aux)
+    
+    for row in range(GRID_SIZE):
+        for col in range(GRID_SIZE):
+            aux = f'([{row}][{col}] = {board[row][col]})'
+            prompt += aux
+    prompt += "\nYour move just return the tupla fila, columna and remember just return tuplas with 'H':"
+    print(f"Asking about: {board}")
+    return prompt
 if __name__ == '__main__':
     main()
