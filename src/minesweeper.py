@@ -15,13 +15,14 @@ How to Play This Version of Minesweeper
 🎯 Objective:
 Uncover all the empty cells without clicking on any mines. If you reveal all non-mine cells, you win! If you click on a mine, you lose.
 🧱 Grid:
-The board is an 8×8 grid.
-20% of the cells are randomly filled with mines (approx. 13 mines).
+You can choose between three different difficulty levels,
+from easy, medium and hard.
+Each level has between 12 and 76 randomly placed mines.
 💡 Ask AI:
 If you're unsure about your next move, click the "Ask AI" button at the bottom of the screen. The AI will analyze the current board and suggest a safe cell to reveal. The suggested move will be played automatically as if you clicked it.
 The AI only suggests unrevealed and unflagged cells.
-Use this feature wisely — it doesn't guarantee safety, but it makes the best guess based on visible information.(Really, AI doesn't know how to play)
-If the AI cannot provide a valid move, your manual click will still be processed.
+Use this feature wisely — it doesn't guarantee safety, but it makes the best guess based on visible information.
+(Truly, AI doesn't know how to play)
 👆 Controls:
 🔍 Left Click:
 Simply click on a cell to reveal it.
